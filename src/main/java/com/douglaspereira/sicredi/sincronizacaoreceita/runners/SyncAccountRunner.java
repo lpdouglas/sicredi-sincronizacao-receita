@@ -1,8 +1,6 @@
 package com.douglaspereira.sicredi.sincronizacaoreceita.runners;
 
 import com.douglaspereira.sicredi.sincronizacaoreceita.exceptions.BusinessException;
-import com.douglaspereira.sicredi.sincronizacaoreceita.external.ReceitaService;
-import com.douglaspereira.sicredi.sincronizacaoreceita.pojos.Account;
 import com.douglaspereira.sicredi.sincronizacaoreceita.services.SyncAccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,12 +8,16 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 @Component
 public class SyncAccountRunner implements ApplicationRunner {
 
     public static final String FILENAME_NOT_PASSED_ON_ARGS = "Filename not passed on args";
+    private static final String ERROR_CREATING_NEW_FILE = "Error creating new file";
+    public static final String FILE_ALREADY_EXISTS = "File already exists";
     private final SyncAccountService syncAccountService;
     private final Logger log;
 
@@ -26,30 +28,40 @@ public class SyncAccountRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        ReceitaService receitaService = new ReceitaService();
-
         try {
-            String filename = getFilenameFromArgs(args);
+            File file = getFileFromArgs(args);
+            File targetFile = createTargetFile(file);
 
-            Set<Account> accounts = syncAccountService.getAccountsFromFile(filename);
-            //Set<Account> accounts = syncAccountService.getAccountsFromMock();
-
-            Set<Account> accountsResult = syncAccountService.syncAccounts(receitaService, accounts);
-
-            syncAccountService.saveAccountsOnFile(filename, accountsResult);
+            syncAccountService.syncAccountsFromFile(file, targetFile);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
     }
 
-    private String getFilenameFromArgs(ApplicationArguments args) throws Exception {
-        String file;
+    private File getFileFromArgs(ApplicationArguments args) throws Exception {
+        String filename;
         if (!args.getNonOptionArgs().isEmpty()) {
-            file = args.getNonOptionArgs().get(0);
+            filename = args.getNonOptionArgs().get(0);
         } else {
             throw new BusinessException(FILENAME_NOT_PASSED_ON_ARGS);
         }
+        File file = new File(filename);
+        if (!file.isFile()) throw new FileNotFoundException();
+
         return file;
+    }
+
+
+    private File createTargetFile(File file) {
+        File targetFile = new File(file.getAbsolutePath().replace(".csv", "").concat("_sincronizado.csv"));
+        try {
+            boolean fileCreated = targetFile.createNewFile();
+            if (!fileCreated) log.warn(FILE_ALREADY_EXISTS);
+
+            return targetFile;
+        } catch (IOException e) {
+            throw new BusinessException(ERROR_CREATING_NEW_FILE);
+        }
     }
 
 }

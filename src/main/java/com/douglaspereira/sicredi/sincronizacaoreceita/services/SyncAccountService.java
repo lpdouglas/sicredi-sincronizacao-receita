@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -21,7 +23,6 @@ public class SyncAccountService {
 
     private static final String ERROR_MAPING_ACCOUNTS_FROM_FILE = "Error maping accounts from file";
     private static final String ERROR_SAVING_FILE = "Error saving file";
-    private static final String ERROR_CREATING_NEW_FILE = "Error creating new file";
     private final Logger log;
     private static final String FIELD_ACCOUNT = "conta";
     private static final String FIELD_AGENCY = "agencia";
@@ -30,12 +31,26 @@ public class SyncAccountService {
     private static final String FIELD_SYNC_RESULT = "sincronizado";
     private static final String CSV_FIELDS_FORMAT = "%s;%s;%s;%s;%s";
     private static final String CSV_FIELD_SEPARATOR = ";";
+    private final ReceitaService receitaService;
 
-    public SyncAccountService() {
+    public SyncAccountService(ReceitaService receitaService) {
+        this.receitaService = receitaService;
         this.log = LoggerFactory.getLogger(SyncAccountService.class);
     }
 
-    public Set<Account> syncAccounts(ReceitaService receitaService, Set<Account> accounts) {
+    public void syncAccountsFromFile(File accountsFile, File targetFile) {
+        Set<Account> accounts = getAccountsFromCsvFile(accountsFile);
+
+        Set<Account> accountsResult = syncAccounts(accounts);
+
+        saveAccountsOnCsvFile(targetFile, accountsResult);
+    }
+
+    private Set<Account> syncAccounts(Set<Account> accounts) {
+        if (accounts.isEmpty()) {
+            log.info("No accounts to sincronize");
+        }
+
         log.info("Sync Accounts with Banco Central: Started");
         Set<Account> accountsResult = accounts.parallelStream().map(contaDTO -> {
             try {
@@ -56,20 +71,21 @@ public class SyncAccountService {
         return accountsResult;
     }
 
-    public Set<Account> getAccountsFromFile(String file) throws BusinessException {
-        try (InputStream fileInputStream = new FileInputStream(new File(file));
+    private Set<Account> getAccountsFromCsvFile(File file) throws BusinessException {
+        try (InputStream fileInputStream = new FileInputStream(file);
              BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream))) {
 
             return bufferedReader.lines()
                     .skip(1)
                     .map(mapToAccount)
                     .collect(Collectors.toSet());
-        } catch (IOException e) {
-            throw new BusinessException(ERROR_MAPING_ACCOUNTS_FROM_FILE);
+        } catch (IOException | IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
+            throw new BusinessException(ERROR_MAPING_ACCOUNTS_FROM_FILE, e);
         }
     }
 
     public Set<Account> getAccountsFromMock() {
+        //TODO Lembrar de criar como imútavel/asList
         Set<Account> accounts = new HashSet<>();
         accounts.add(new Account("0101", "12345-6", 100.50, StatusContaEnum.A));
         accounts.add(new Account("0202", "23456-7", 200.40, StatusContaEnum.B));
@@ -87,23 +103,16 @@ public class SyncAccountService {
         return accounts;
     }
 
-    public void saveAccountsOnFile(String originalFilename, Set<Account> accountsResult) throws BusinessException {
-        if (originalFilename == null || originalFilename.isEmpty()) throw new NullPointerException();
-
-        File file = new File(originalFilename.replace(".csv", "").concat("_sincronizado.csv"));
-        try {
-            file.createNewFile();
-        } catch (IOException e) {
-            throw new BusinessException(ERROR_CREATING_NEW_FILE);
-        }
-
+    private void saveAccountsOnCsvFile(File file, Set<Account> accountsResult) throws BusinessException {
         try (FileOutputStream fileOutputStream = new FileOutputStream(file);
              BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream))) {
 
             log.info("Writing on file {}", file.getAbsoluteFile());
             bufferedWriter.write(String.format(CSV_FIELDS_FORMAT, FIELD_AGENCY, FIELD_ACCOUNT, FIELD_BALANCE, FIELD_STATUS, FIELD_SYNC_RESULT));
 
-            final DecimalFormat brazilCurrency = new DecimalFormat("#,##0.00");
+            DecimalFormat brazilCurrency = (DecimalFormat) NumberFormat.getNumberInstance(new Locale("pt", "br"));
+            brazilCurrency.applyPattern("#0.00");
+
             accountsResult.forEach(account -> {
                 try {
                     bufferedWriter.newLine();
