@@ -1,7 +1,7 @@
 package com.douglaspereira.sicredi.sincronizacaoreceita.runners;
 
 import com.douglaspereira.sicredi.sincronizacaoreceita.exceptions.BusinessException;
-import com.douglaspereira.sicredi.sincronizacaoreceita.services.SyncAccountService;
+import com.douglaspereira.sicredi.sincronizacaoreceita.services.SyncAccountServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -18,10 +18,10 @@ public class SyncAccountRunner implements ApplicationRunner {
     public static final String FILENAME_NOT_PASSED_ON_ARGS = "Filename not passed on args";
     private static final String ERROR_CREATING_NEW_FILE = "Error creating new file";
     public static final String FILE_ALREADY_EXISTS = "File already exists";
-    private final SyncAccountService syncAccountService;
+    private final SyncAccountServiceImpl syncAccountService;
     private final Logger log;
 
-    public SyncAccountRunner(SyncAccountService syncAccountService) {
+    public SyncAccountRunner(SyncAccountServiceImpl syncAccountService) {
         this.syncAccountService = syncAccountService;
         this.log = LoggerFactory.getLogger(SyncAccountRunner.class);
     }

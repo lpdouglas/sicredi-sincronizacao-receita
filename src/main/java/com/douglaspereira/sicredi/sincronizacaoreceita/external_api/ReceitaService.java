@@ -1,4 +1,4 @@
-package com.douglaspereira.sicredi.sincronizacaoreceita.external;
+package com.douglaspereira.sicredi.sincronizacaoreceita.external_api;
 
 import java.util.ArrayList;
 import java.util.List;

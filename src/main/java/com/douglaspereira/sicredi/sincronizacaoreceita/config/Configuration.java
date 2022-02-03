@@ -1,6 +1,6 @@
 package com.douglaspereira.sicredi.sincronizacaoreceita.config;
 
-import com.douglaspereira.sicredi.sincronizacaoreceita.external.ReceitaService;
+import com.douglaspereira.sicredi.sincronizacaoreceita.external_api.ReceitaService;
 import org.springframework.context.annotation.Bean;
 
 @org.springframework.context.annotation.Configuration
