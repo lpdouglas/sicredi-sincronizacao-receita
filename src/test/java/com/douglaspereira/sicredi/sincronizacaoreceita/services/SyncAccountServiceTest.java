@@ -3,7 +3,7 @@ package com.douglaspereira.sicredi.sincronizacaoreceita.services;
 import com.douglaspereira.sicredi.sincronizacaoreceita.enums.StatusContaEnum;
 import com.douglaspereira.sicredi.sincronizacaoreceita.enums.SyncResultEnum;
 import com.douglaspereira.sicredi.sincronizacaoreceita.exceptions.BusinessException;
-import com.douglaspereira.sicredi.sincronizacaoreceita.external_api.ReceitaService;
+import com.douglaspereira.sicredi.sincronizacaoreceita.external.api.ReceitaService;
 import com.douglaspereira.sicredi.sincronizacaoreceita.pojos.Account;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SyncAccountServiceTest {
 
     private SyncAccountServiceImpl syncAccountService;
+    private String accountPath = "src/test/resources/";
 
     @BeforeEach
     void setUp() {
@@ -26,9 +27,8 @@ class SyncAccountServiceTest {
 
     @Test
     void syncAccountsFromFile() throws IOException {
-        String path = "src/test/resources/";
-        File accountFiles = new File(path + "contas-teste.csv");
-        File targetFile = new File(path + "contas-teste_sincronizado.csv");
+        File accountFiles = new File(accountPath + "contas-teste.csv");
+        File targetFile = new File(accountPath + "contas-teste_sincronizado.csv");
         targetFile.delete();
         syncAccountService.syncAccountsFromFile(accountFiles, targetFile);
 
@@ -41,9 +41,8 @@ class SyncAccountServiceTest {
 
     @Test
     void syncAccountsFromFileWithoutFile() {
-        String path = "src/test/resources/";
-        File accountFiles = new File(path + "contas-teste-nao-existe.csv");
-        File targetFile = new File(path + "contas-teste_sincronizado.csv");
+        File accountFiles = new File(accountPath + "contas-teste-nao-existe.csv");
+        File targetFile = new File(accountPath + "contas-teste_sincronizado.csv");
 
         Exception errorType = null;
         try {
@@ -60,7 +59,7 @@ class SyncAccountServiceTest {
         try (InputStream fileInputStream = new FileInputStream(file);
              BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream))) {
 
-            Set<Account> collectAccounts = bufferedReader.lines()
+            return bufferedReader.lines()
                     .skip(1)
                     .map(line -> {
                         String[] p = line.split(";");
@@ -72,8 +71,6 @@ class SyncAccountServiceTest {
                         return account;
                     })
                     .collect(Collectors.toSet());
-
-            return collectAccounts;
         }
     }
 

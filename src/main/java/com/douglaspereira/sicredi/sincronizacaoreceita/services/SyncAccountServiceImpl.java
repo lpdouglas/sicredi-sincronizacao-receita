@@ -3,7 +3,7 @@ package com.douglaspereira.sicredi.sincronizacaoreceita.services;
 import com.douglaspereira.sicredi.sincronizacaoreceita.enums.StatusContaEnum;
 import com.douglaspereira.sicredi.sincronizacaoreceita.enums.SyncResultEnum;
 import com.douglaspereira.sicredi.sincronizacaoreceita.exceptions.BusinessException;
-import com.douglaspereira.sicredi.sincronizacaoreceita.external_api.ReceitaService;
+import com.douglaspereira.sicredi.sincronizacaoreceita.external.api.ReceitaService;
 import com.douglaspereira.sicredi.sincronizacaoreceita.pojos.Account;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
