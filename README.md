@@ -16,10 +16,10 @@ Usar o "serviço da receita" (fake) para processamento automático do arquivo.
 
 
 #### Formato CSV:
-agencia;conta;saldo;status
-0101;12225-6;100,00;A
-0101;12226-8;3200,50;A
-3202;40011-1;-35,12;I
-3202;54001-2;0,00;P
-3202;00321-2;34500,00;B
+agencia;conta;saldo;status<br>
+0101;12225-6;100,00;A<br>
+0101;12226-8;3200,50;A<br>
+3202;40011-1;-35,12;I<br>
+3202;54001-2;0,00;P<br>
+3202;00321-2;34500,00;B<br>
 ...
