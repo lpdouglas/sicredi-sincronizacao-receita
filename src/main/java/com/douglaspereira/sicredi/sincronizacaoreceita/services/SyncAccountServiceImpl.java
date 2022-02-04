@@ -13,9 +13,6 @@ import java.io.*;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Locale;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 public class SyncAccountServiceImpl implements SyncAccountService {
@@ -28,6 +25,7 @@ public class SyncAccountServiceImpl implements SyncAccountService {
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_SYNC_RESULT = "sincronizado";
     private static final String CSV_FIELDS_FORMAT = "%s;%s;%s;%s;%s";
+    private static final String CSV_FIELDS_FORMAT_SAVE = "%n%s;%s;%s;%s;%s";
     private static final String CSV_FIELD_SEPARATOR = ";";
     private final ReceitaService receitaService;
 
@@ -38,84 +36,60 @@ public class SyncAccountServiceImpl implements SyncAccountService {
 
     @Override
     public void syncAccountsFromFile(File accountsFile, File targetFile) {
-        Set<Account> accounts = getAccountsFromCsvFile(accountsFile);
-
-        Set<Account> accountsResult = syncAccounts(accounts);
-
-        saveAccountsOnCsvFile(targetFile, accountsResult);
+        log.info("Start Process: Reading from file {}", accountsFile.getAbsoluteFile());
+        processAccountsFromCsvFile(accountsFile, targetFile);
+        log.info("Ended Process: Saved in the file {}", targetFile.getAbsoluteFile());
     }
 
-    private Set<Account> syncAccounts(Set<Account> accounts) {
-        if (accounts.isEmpty()) {
-            log.info("No accounts to sincronize");
-        }
-
-        log.info("Sync Accounts with Banco Central: Started");
-        Set<Account> accountsResult = accounts.parallelStream().map(contaDTO -> {
-            try {
-                boolean isContaAtualizada = receitaService.atualizarConta(
-                        contaDTO.getAgency(),
-                        contaDTO.getAccount().replace("-", ""),
-                        contaDTO.getBalance(),
-                        contaDTO.getStatus().name());
-                contaDTO.setResult(isContaAtualizada ? SyncResultEnum.SYNCRONIZED : SyncResultEnum.NOT_SYNCRONIZED);
-
-                return contaDTO;
-            } catch (InterruptedException | RuntimeException e) {
-                contaDTO.setResult(SyncResultEnum.ERROR);
-                return contaDTO;
-            }
-        }).collect(Collectors.toSet());
-        log.info("Sync Accounts with Banco Central: Ended");
-        return accountsResult;
-    }
-
-    private Set<Account> getAccountsFromCsvFile(File file) throws BusinessException {
+    private void processAccountsFromCsvFile(File file, File targetFile) throws BusinessException {
         try (InputStream fileInputStream = new FileInputStream(file);
-             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream))) {
+             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream));
+             FileOutputStream fileOutputStream = new FileOutputStream(targetFile);
+             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream))) {
 
-            return bufferedReader.lines()
+            DecimalFormat brazilCurrency = (DecimalFormat) NumberFormat.getNumberInstance(new Locale("pt", "br"));
+            brazilCurrency.applyPattern("#0.00");
+            bufferedWriter.write(String.format(CSV_FIELDS_FORMAT, FIELD_AGENCY, FIELD_ACCOUNT, FIELD_BALANCE, FIELD_STATUS, FIELD_SYNC_RESULT));
+            bufferedReader.lines()
                     .skip(1)
-                    .map(mapToAccount)
-                    .collect(Collectors.toSet());
+                    .parallel()
+                    .forEach(line -> {
+                        String[] p = line.split(CSV_FIELD_SEPARATOR);
+                        Account account = new Account(p[0], p[1], Double.parseDouble(p[2].replace(",", ".")), StatusContaEnum.valueOf(p[3]));
+                        syncAccount(account);
+                        saveAccountOnCsvFile(account, bufferedWriter, brazilCurrency);
+                        log.info("Processed Account {} with Banco Central", account.getAccount());
+                    });
+
         } catch (IOException | IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
             throw new BusinessException(ERROR_MAPING_ACCOUNTS_FROM_FILE, e);
         }
     }
 
-    private void saveAccountsOnCsvFile(File file, Set<Account> accountsResult) throws BusinessException {
-        try (FileOutputStream fileOutputStream = new FileOutputStream(file);
-             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream))) {
+    private void syncAccount(Account account) {
+        try {
+            boolean isContaAtualizada = receitaService.atualizarConta(
+                    account.getAgency(),
+                    account.getAccount().replace("-", ""),
+                    account.getBalance(),
+                    account.getStatus().name());
+            account.setResult(isContaAtualizada ? SyncResultEnum.SYNCRONIZED : SyncResultEnum.NOT_SYNCRONIZED);
+        } catch (InterruptedException | RuntimeException e) {
+            account.setResult(SyncResultEnum.ERROR);
+        }
+    }
 
-            log.info("Writing on file {}", file.getAbsoluteFile());
-            bufferedWriter.write(String.format(CSV_FIELDS_FORMAT, FIELD_AGENCY, FIELD_ACCOUNT, FIELD_BALANCE, FIELD_STATUS, FIELD_SYNC_RESULT));
+    private void saveAccountOnCsvFile(Account account, BufferedWriter bufferedWriter, DecimalFormat currencyFormat) throws BusinessException {
+        try {
+            bufferedWriter.write(String.format(CSV_FIELDS_FORMAT_SAVE,
+                    account.getAgency(),
+                    account.getAccount(),
+                    currencyFormat.format(account.getBalance()),
+                    account.getStatus(),
+                    account.getResult()));
 
-            DecimalFormat brazilCurrency = (DecimalFormat) NumberFormat.getNumberInstance(new Locale("pt", "br"));
-            brazilCurrency.applyPattern("#0.00");
-
-            accountsResult.forEach(account -> {
-                try {
-                    bufferedWriter.newLine();
-                    bufferedWriter.write(String.format(CSV_FIELDS_FORMAT,
-                            account.getAgency(),
-                            account.getAccount(),
-                            brazilCurrency.format(account.getBalance()),
-                            account.getStatus(),
-                            account.getResult()));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-
-            log.info("Saved on file: {}", file.getAbsoluteFile());
         } catch (IOException e) {
             throw new BusinessException(ERROR_SAVING_FILE);
         }
     }
-
-    private final Function<String, Account> mapToAccount = (line) -> {
-        String[] p = line.split(CSV_FIELD_SEPARATOR);
-        return new Account(p[0], p[1], Double.parseDouble(p[2].replace(",", ".")), StatusContaEnum.valueOf(p[3]));
-    };
-
 }
