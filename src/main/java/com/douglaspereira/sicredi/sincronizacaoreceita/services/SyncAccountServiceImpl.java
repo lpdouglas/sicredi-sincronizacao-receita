@@ -37,12 +37,8 @@ public class SyncAccountServiceImpl implements SyncAccountService {
     @Override
     public void syncAccountsFromFile(File accountsFile, File targetFile) {
         log.info("Start Process: Reading from file {}", accountsFile.getAbsoluteFile());
-        processAccountsFromCsvFile(accountsFile, targetFile);
-        log.info("Ended Process: Saved in the file {}", targetFile.getAbsoluteFile());
-    }
 
-    private void processAccountsFromCsvFile(File file, File targetFile) throws BusinessException {
-        try (InputStream fileInputStream = new FileInputStream(file);
+        try (InputStream fileInputStream = new FileInputStream(accountsFile);
              BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream));
              FileOutputStream fileOutputStream = new FileOutputStream(targetFile);
              BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream))) {
@@ -54,8 +50,7 @@ public class SyncAccountServiceImpl implements SyncAccountService {
                     .skip(1)
                     .parallel()
                     .forEach(line -> {
-                        String[] p = line.split(CSV_FIELD_SEPARATOR);
-                        Account account = new Account(p[0], p[1], Double.parseDouble(p[2].replace(",", ".")), StatusContaEnum.valueOf(p[3]));
+                        Account account = getAccountFromString(line);
                         syncAccount(account);
                         saveAccountOnCsvFile(account, bufferedWriter, brazilCurrency);
                         log.info("Processed Account {} with Banco Central", account.getAccount());
@@ -64,7 +59,15 @@ public class SyncAccountServiceImpl implements SyncAccountService {
         } catch (IOException | IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
             throw new BusinessException(ERROR_MAPING_ACCOUNTS_FROM_FILE, e);
         }
+
+        log.info("Ended Process: Saved in the file {}", targetFile.getAbsoluteFile());
     }
+
+    private Account getAccountFromString(String line) {
+        String[] p = line.split(CSV_FIELD_SEPARATOR);
+        return new Account(p[0], p[1], Double.parseDouble(p[2].replace(",", ".")), StatusContaEnum.valueOf(p[3]));
+    }
+
 
     private void syncAccount(Account account) {
         try {
